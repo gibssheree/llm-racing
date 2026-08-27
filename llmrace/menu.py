@@ -144,6 +144,9 @@ class Menu:
             pygame.draw.rect(screen, e.color, (x, y + 3, 6, 16), border_radius=2)
             pygame.draw.rect(screen, e.accent, (x, y + 3, 6, 6), border_radius=2)
             screen.blit(fonts["body"].render(e.name, True, ui.TEXT), (x + 16, y))
+            if getattr(e, "submitted", False):
+                mark = fonts["tiny"].render("model-designed", True, ui.OK)
+                screen.blit(mark, (x + 24 + fonts["body"].size(e.name)[0], y + 3))
             y += 26
 
     # -------------------------------------------------------- track picker --
@@ -265,6 +268,10 @@ class Menu:
                              border_radius=2)
             fg = ui.TEXT if on else ui.FAINT
             screen.blit(fonts["bold"].render(e.name, True, fg), (r.x + 64, r.centery - 9))
+            if getattr(e, "submitted", False):
+                # this car's numbers came from the model itself, not the factory
+                badge = fonts["tiny"].render("DESIGNED BY THE MODEL", True, ui.OK)
+                screen.blit(badge, (r.x + 64, r.centery + 8))
             screen.blit(fonts["tiny"].render(e.vendor, True, ui.DIM if on else ui.FAINT),
                         (r.x + 252, r.centery - 6))
             tag = e.tagline
@@ -297,7 +304,7 @@ class Menu:
 
         self.widgets += [
             ui.Stepper((x, y, 600, 52), "Race distance", lambda: s.laps,
-                       setter("laps"), 1, 20, 1, lambda v: f"{v} laps"),
+                       setter("laps"), 1, 50, 1, lambda v: f"{v} laps"),
             ui.Toggle((x, y + 66, 600, 52), "Sensor overlay",
                       lambda: s.show_sensors, setter("show_sensors"),
                       "draw the focused car's vision fan"),

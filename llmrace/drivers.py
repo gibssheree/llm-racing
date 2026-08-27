@@ -57,6 +57,7 @@ class ModelEntry:
     vendor: str
     color: tuple
     accent: tuple         # livery stripe
+    livery: str           # what that colour is called, in words
     tagline: str
     chassis: Chassis
     brain: Brain
@@ -65,24 +66,27 @@ class ModelEntry:
     sensor_range: float = cfg.SENSOR_RANGE
     sensor_count: int = 9
     stats: dict = field(default_factory=dict)
+    submitted: bool = False   # True once a real model's design replaced it
 
 
 ROSTER = [
     ModelEntry(
         key="claude", name="Claude Opus 5", vendor="Anthropic",
         color=(232, 120, 60), accent=(255, 190, 130),
+        livery="orange",
         tagline="Late on the brakes, never off the road.",
         chassis=Chassis(power=292, top_speed=420, brake=575, grip=250,
                         steer_rate=2.85, steer_falloff=0.52, mass=1.00,
                         downforce=0.34, drag=1.0),
         brain=Brain(wide_gain=1.28, fine_gain=0.62, damping=0.42,
-                    confidence=0.99, caution=0.98, brake_gain=1.22,
+                    confidence=0.938, caution=0.98, brake_gain=1.22,
                     throttle_gain=1.05, apex_bias=0.10, avoidance=1.05, recovery=1.10),
         temper=Temper(reaction=0.085, noise=0.008, aggression=0.72, consistency=0.95),
         seed=1101),
     ModelEntry(
         key="gpt", name="GPT-5.5", vendor="OpenAI",
         color=(238, 238, 242), accent=(24, 24, 28),
+        livery="white with a black stripe",
         tagline="Generalist chassis. Fastest on the straights.",
         chassis=Chassis(power=286, top_speed=438, brake=520, grip=262,
                         steer_rate=2.75, steer_falloff=0.58, mass=1.02,
@@ -95,18 +99,20 @@ ROSTER = [
     ModelEntry(
         key="gemini", name="Gemini 3 Flash", vendor="Google",
         color=(66, 133, 244), accent=(160, 200, 255),
+        livery="blue",
         tagline="Blistering out of corners. Sometimes too keen.",
         chassis=Chassis(power=322, top_speed=414, brake=522, grip=238,
                         steer_rate=3.15, steer_falloff=0.62, mass=0.95,
                         downforce=0.28, drag=1.04),
         brain=Brain(wide_gain=1.42, fine_gain=0.70, damping=0.30,
-                    confidence=0.99, caution=0.90, brake_gain=1.02,
+                    confidence=0.938, caution=0.90, brake_gain=1.02,
                     throttle_gain=1.24, apex_bias=0.16, avoidance=1.18, recovery=0.92),
         temper=Temper(reaction=0.070, noise=0.020, aggression=0.86, consistency=0.80),
         seed=3037),
     ModelEntry(
         key="perplexity", name="Sonar Large", vendor="Perplexity",
         color=(32, 128, 141), accent=(150, 226, 232),
+        livery="teal",
         tagline="Sees the corner before anyone else does.",
         chassis=Chassis(power=278, top_speed=404, brake=556, grip=268,
                         steer_rate=2.95, steer_falloff=0.52, mass=1.00,
@@ -117,9 +123,10 @@ ROSTER = [
         temper=Temper(reaction=0.078, noise=0.009, aggression=0.66, consistency=0.93),
         seed=7311, sensor_range=700.0, sensor_count=11),
     ModelEntry(
-        key="llama", name="Llama 4 Maverick", vendor="Meta",
+        key="deepseek", name="DeepSeek V3.2", vendor="DeepSeek",
         color=(76, 175, 80), accent=(190, 240, 190),
-        tagline="Heavy, planted, and extremely hard to shake off.",
+        livery="green",
+        tagline="Enormous grip for the money. Hard to shake off.",
         chassis=Chassis(power=262, top_speed=402, brake=585, grip=300,
                         steer_rate=2.7, steer_falloff=0.44, mass=1.14,
                         downforce=0.4, drag=1.0),
@@ -131,6 +138,7 @@ ROSTER = [
     ModelEntry(
         key="grok", name="Grok 4", vendor="xAI",
         color=(217, 51, 63), accent=(255, 150, 155),
+        livery="red",
         tagline="Enormous top end. The brakes are a rumour.",
         chassis=Chassis(power=306, top_speed=448, brake=470, grip=222,
                         steer_rate=2.9, steer_falloff=0.68, mass=0.98,
@@ -141,18 +149,27 @@ ROSTER = [
         temper=Temper(reaction=0.066, noise=0.024, aggression=0.94, consistency=0.74),
         seed=1442),
     ModelEntry(
-        key="mistral", name="Le Chat Large", vendor="Mistral",
+        key="kimi", name="Kimi K2", vendor="Moonshot AI",
         color=(242, 179, 61), accent=(255, 225, 150),
-        tagline="Featherweight. Changes direction on a whim.",
+        livery="yellow",
+        tagline="Featherweight. Quick to change its line.",
         chassis=Chassis(power=300, top_speed=410, brake=535, grip=234,
                         steer_rate=3.3, steer_falloff=0.7, mass=0.90,
                         downforce=0.24, drag=1.06),
         brain=Brain(wide_gain=1.46, fine_gain=0.76, damping=0.28,
-                    confidence=0.99, caution=0.94, brake_gain=1.08,
+                    confidence=0.938, caution=0.94, brake_gain=1.08,
                     throttle_gain=1.16, apex_bias=0.14, avoidance=1.22, recovery=0.94),
         temper=Temper(reaction=0.072, noise=0.017, aggression=0.82, consistency=0.83),
         seed=8123),
 ]
+
+
+# Cars designed by outside models live in garage/*.json and take priority over
+# the factory entries above. An invalid submission is skipped, never silently
+# raced. See brief.py and submit.py.
+from . import garage as _garage          # noqa: E402  (import here to avoid a cycle)
+
+SUBMITTED = _garage.apply_to(ROSTER)
 
 
 def by_key(key):

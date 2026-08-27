@@ -91,13 +91,15 @@ def draw_standings(screen, fonts, race, focus_key, x=14, y=14, w=286):
         elif car is leader:
             txt, col = "LEADER", cfg.C_ACCENT
         else:
-            # gap in laps if lapped, otherwise an estimated time gap
+            # Gap in laps if lapped, otherwise an estimated time gap.
+            # Converted at a single reference pace for the whole field: using
+            # each car's own instantaneous speed made the column jump around
+            # and put bigger gaps above smaller ones.
             dl = leader.race_progress() - car.race_progress()
             if dl >= 1.0:
                 txt, col = f"+{int(dl)}L", cfg.C_TEXT_DIM
             else:
-                pace = max(car.speed, 60.0)
-                txt = f"+{dl * race.track.length / pace:4.1f}"
+                txt = f"+{dl * race.track.length / race.reference_pace():4.1f}"
                 col = cfg.C_TEXT_DIM
         g = fonts["small"].render(txt, True, col)
         screen.blit(g, (x + w - 12 - g.get_width(), ry + 6))

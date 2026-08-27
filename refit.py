@@ -13,16 +13,33 @@ import sys
 import math
 
 sys.path.insert(0, '.')
+from llmrace import config as cfg
 from llmrace.track import Track
-from llmrace.ai import build_brain, Vision, N_EXTRA_FEATURES
-from llmrace.drivers import by_key
+from llmrace.ai import build_brain, Vision, N_EXTRA_FEATURES, REF_GRIP, REF_TOP_SPEED
+from llmrace.drivers import ROSTER
 from llmrace.tracks import PRESETS
 
-REF = "claude"          # the chassis the head is fitted against
+
+def reference_entry():
+    """A clean reference car, so the fit is self-consistent.
+
+    The head's coefficients are quoted per unit of `confidence * phys`, and
+    phys is 1.0 only when grip and top_speed match the reference chassis. Using
+    a car off the grid - especially one designed by a model - silently folded
+    its own grip and bravery into the constants.
+    """
+    import copy
+    e = copy.deepcopy(ROSTER[0])
+    e.chassis.grip = REF_GRIP
+    e.chassis.top_speed = REF_TOP_SPEED
+    e.brain.confidence = 1.0
+    e.sensor_count = 9
+    e.sensor_range = cfg.SENSOR_RANGE
+    return e
 
 
 def main():
-    e = by_key(REF)
+    e = reference_entry()
     net = build_brain(e)
     rows, targets = [], []
     for preset in PRESETS:

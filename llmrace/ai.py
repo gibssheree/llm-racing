@@ -163,15 +163,19 @@ def build_brain(entry):
     sensor_row(1, lambda x: x * gauss(x, 0.5), 1.55)
     sensor_row(1, lambda x: -x * gauss(x, 0.5), 1.55 * b.avoidance, occ0)
     # h2 - forward clearance: how much road is left straight ahead.
-    # The gain is deliberately small so tanh stays in its linear region -
-    # this unit has to encode *how much* room there is, not just whether
-    # there is any, because target speed is read straight off it.
-    sensor_row(2, lambda x: gauss(x, 0.34), 0.62)
+    #
+    # The gain is deliberately small so tanh stays in its linear region - this
+    # unit has to encode *how much* room there is, not just whether there is
+    # any, because target speed is read straight off it. The window is narrow
+    # for the same reason: only the rays within about 11 degrees of the nose
+    # can see far enough to report how far the road continues, and letting the
+    # wider rays in diluted the signal with what is really just road width.
+    sensor_row(2, lambda x: gauss(x, 0.20), 0.62)
     # h3 - speed
     net.w1[3][i_speed] = 1.9
     net.b1[3] = -0.55
     # h4 - closing rate: fast plus no road ahead equals trouble
-    sensor_row(4, lambda x: -gauss(x, 0.30), 0.58)
+    sensor_row(4, lambda x: -gauss(x, 0.22), 0.58)
     net.w1[4][i_speed] = 0.90
     # h5 / h6 - mid-range flanks, used to pick a line through the corner
     sensor_row(5, lambda x: gauss(x + 0.5, 0.42) if x < -0.12 else 0.0, 0.95)
@@ -214,11 +218,11 @@ def build_brain(entry):
     # that built a grippier car therefore genuinely commits to faster corners.
     ch = entry.chassis
     phys = math.sqrt(ch.grip / REF_GRIP) * (REF_TOP_SPEED / ch.top_speed)
-    net.w2[1][2] = 3.21 * b.confidence * phys
+    net.w2[1][2] = 1.97 * b.confidence * phys
     net.w2[1][4] = -0.25 * b.caution     # damper: bleeds speed when fast and blind
     net.w2[1][8] = -0.55                 # off the road, slow down
     net.w2[1][9] = -0.30 * (1.35 - entry.temper.aggression)
-    net.b2[1] = -0.55 * phys
+    net.b2[1] = 0.10 * phys
 
     net.jitter(random.Random(entry.seed), 0.006)
     return net

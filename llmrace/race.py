@@ -51,7 +51,8 @@ class Race:
 
         if all(c.finished for c in self.cars):
             self.state = FINISHED
-        elif self.flag_time is not None and self.time - self.flag_time > FLAG_GRACE:
+        elif (self.flag_time is not None
+              and self.time - self.flag_time > self.flag_grace()):
             # called on time: whoever is still out is classified where they lie
             self.state = FINISHED
 
@@ -82,3 +83,25 @@ class Race:
 
     def leader(self):
         return self.standings()[0]
+
+    def flag_grace(self):
+        """How long the stragglers get after the winner is home.
+
+        Enough to finish the lap they are on, so a long race does not call the
+        flag on a car that is simply a lap down rather than in trouble.
+        """
+        best = min((c.best_lap for c in self.cars if c.best_lap), default=None)
+        return max(FLAG_GRACE, (best or 30.0) * 1.6)
+
+    def reference_pace(self):
+        """One representative speed for the whole field, in px/s.
+
+        Time gaps have to be converted from distance at a *shared* pace, or a
+        car that happens to be braking shows a larger gap than one further back
+        on the straight.
+        """
+        best = min((c.best_lap for c in self.cars if c.best_lap), default=None)
+        if best:
+            return self.track.length / best
+        moving = [c.speed for c in self.cars if not c.finished]
+        return max(60.0, sum(moving) / len(moving)) if moving else 300.0

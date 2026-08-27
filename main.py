@@ -2,7 +2,7 @@
 
     python main.py                 3-lap race, full grid
     python main.py --laps 5
-    python main.py --only claude gpt grok llama
+    python main.py --only claude gpt grok deepseek
     python main.py --track technical --laps 5
 """
 import argparse

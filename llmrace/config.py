@@ -6,22 +6,24 @@ FPS = 60
 TITLE = "LLM GRAND PRIX"
 
 # The world the track lives in (pixels). Bigger than the screen; camera pans.
-WORLD_W, WORLD_H = 3000, 2000
+WORLD_W, WORLD_H = 3800, 2500
 
 # ------------------------------------------------------------------ track ----
-TRACK_HALF_WIDTH = 100         # road is 200px wide - still 11 car-widths across
+TRACK_HALF_WIDTH = 150         # road is 300px wide. Cars are still 34px, so a
+                               # bigger circuit at the same car size means more
+                               # room to race side by side.
 KERB_WIDTH = 14
 SAMPLES_PER_SEGMENT = 30       # raw spline resolution per control segment
 SMOOTH_PASSES = 4              # Laplacian passes that remove spline kinks
 SAMPLE_SPACING = 15.0          # final uniform centreline spacing (px)
-GRID_CELL = 130                # spatial hash cell (must be >= TRACK_HALF_WIDTH)
+GRID_CELL = 160                # spatial hash cell (must be >= TRACK_HALF_WIDTH)
 MASK_RES = 4                   # tarmac bitmap resolution, px per cell
 
 # ------------------------------------------------------------------- race ----
 DEFAULT_LAPS = 3
 COUNTDOWN_SECONDS = 3.6
-GRID_ROW_GAP = 70              # spacing between rows on the starting grid
-GRID_COL_GAP = 58              # lateral spacing between the two grid columns
+GRID_ROW_GAP = 82              # spacing between rows on the starting grid
+GRID_COL_GAP = 84              # lateral spacing between the two grid columns
 
 # ---------------------------------------------------------------- physics ----
 # Units are pixels and seconds. One "metre" is roughly 12px.
@@ -35,7 +37,11 @@ CAR_WIDTH = 18
 COLLISION_RADIUS = 15
 
 # ----------------------------------------------------------------- vision ----
-SENSOR_RANGE = 560.0           # how far a car can "see" the track edge
+SENSOR_RANGE = 711.0           # how far a car can "see" the track edge.
+                               # Scales with the world: at 560 on the enlarged
+                               # circuits the forward beam saturated for 46% of
+                               # a lap and the driver could no longer tell a
+                               # hairpin from a straight.
 SENSOR_STEP = 10.0             # raycast marching step (px)
 PROXIMITY_RANGE = 130.0        # how far a car can sense another car
 

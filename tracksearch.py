@@ -14,10 +14,11 @@ sys.path.insert(0, '.')
 from llmrace.track import Track
 from llmrace import config as cfg
 
-MIN_RADIUS = 142.0      # tight enough for a real hairpin at a 100px half width
-                        # (inner kerb still has 42px of radius left)
-MIN_CLEAR = 252.0       # 2 * half width + room for a car between two straights
-MARGIN = 46.0
+MIN_RADIUS = 192.0      # tight enough for a real hairpin at a 150px half width
+                        # (the inner kerb still has 45px of radius left; pushing this
+                        # higher just rounds the hairpins back into bends)
+MIN_CLEAR = 344.0       # 2 * half width + room for a car between two straights
+MARGIN = 38.0
 SEP = 26                # samples apart before two bits of track count as separate
 
 
@@ -61,7 +62,7 @@ def metrics(control):
     xs = [p[0] for p in t.left + t.right]
     ys = [p[1] for p in t.left + t.right]
     fwd = [t.raycast(*t.center[i], *t.tangent[i]) for i in range(m)]
-    hair = sum(1 for r in rs if r < 260) / m
+    hair = sum(1 for r in rs if r < t.half_width * 2.2) / m
     return {
         "track": t, "minR": min(rs), "clear": clear, "pair": pair,
         "len": t.length, "flat": sum(1 for d in fwd if d >= 559) / m,

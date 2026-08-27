@@ -3,6 +3,11 @@ import sys, json
 sys.path.insert(0, '.')
 from tracksearch import repair, report, legal
 from layouts import DRAFTS
+from llmrace.tracks import PRESETS
+
+# start from the shapes already in the game where possible - they are nearly
+# legal for the new width, so repair barely has to move them
+CURRENT = {p.key: [tuple(q) for q in p.control] for p in PRESETS}
 
 out = {}
 for key, cp in DRAFTS.items():

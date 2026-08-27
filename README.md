@@ -15,7 +15,7 @@ Everything is configurable from the menus. The command line is just a shortcut:
 
 ```bash
 python main.py --track technical --laps 5
-python main.py --only claude grok gemini llama
+python main.py --only claude grok gemini deepseek
 python main.py --list
 ```
 
@@ -35,9 +35,9 @@ python main.py --list
 | white/black | GPT-5.5 | OpenAI | Generalist chassis, fastest on the straights |
 | blue | Gemini 3 Flash | Google | Blistering out of corners, sometimes too keen |
 | teal | Sonar Large | Perplexity | 11 sensors at 700px: sees the corner first |
-| green | Llama 4 Maverick | Meta | Heavy, planted, never slides |
+| green | DeepSeek V3.2 | DeepSeek | Enormous grip for the money, never slides |
 | red | Grok 4 | xAI | Enormous top end, the brakes are a rumour |
-| yellow | Le Chat Large | Mistral | Featherweight, changes direction on a whim |
+| yellow | Kimi K2 | Moonshot AI | Featherweight, quick to change its line |
 
 ## How a car drives
 
@@ -82,6 +82,27 @@ the entire field queue up nose-to-tail and crawl. With them split, a rival eatin
 right-hand rays pushes the gap detector left and the car goes round — overtaking falls out
 of the same behaviour that keeps it on the road, weighted per model by `avoidance`.
 
+A car sitting directly behind a rival gives up 12–20% of its target speed, which is what
+stops the field rear-ending each other. But the quickest and slowest cars are separated by
+only about 4% on lap time, so a follower that never gets out of the slipstream can never
+close. The penalty releases as soon as the car is more than 34px offline — so how much road
+there is to step out into decides whether anybody ever passes.
+
+On the 200px road that was 34% of the half-width, and the racing died: `overtake.py`
+measured **0.7 passes per race**. Widening to 240px took it to **8**. Scaling the whole world
+up 1.27x afterwards — same car size, bigger circuits, 300px road — took it to **34**. Run
+`python overtake.py` to measure it after any change.
+
+Two things had to move with the world when it grew, because both are measured in world pixels
+rather than being properties of a car:
+
+- `SENSOR_RANGE`, the reference the sensors normalise against. Left at 560 on the enlarged
+  circuits, the forward beam saturated for 46% of a lap and the driver could no longer tell a
+  hairpin from a straight. It scales to 711.
+- Each car's own `sensor_range`. Submissions carry a `spec_version`; anything written against
+  the older, smaller world is converted on load, so a car's *relative* choice within the
+  allowed band is preserved and nobody's design is edited.
+
 ## Physics
 
 Bicycle-style model at 120Hz. Turning the wheel points the tyres somewhere new; the tyres
@@ -124,10 +145,57 @@ collapses off-track. Resistance is calibrated so full throttle settles exactly o
 The status line along the bottom always says which camera mode is live and who is
 being watched.
 
+## Letting the real models design their own cars
+
+The seven cars shipped here are my guesses at what each vendor would build. The
+point of `spec.py` is that they do not have to stay guesses — you can send each
+model the actual design brief and race whatever it sends back.
+
+```bash
+python brief.py                 # writes briefs/<key>.md, one per entrant
+```
+
+Send `briefs/claude.md` to Claude, `briefs/gpt.md` to GPT, and so on. Each brief
+is self-contained: the physics, what the driver can see, the six circuits, all
+25 fields with ranges and units, the budget rules, and the exact JSON to reply
+with. It is generated from `llmrace/spec.py`, so it can never describe a field
+the game does not have or quote a range the validator would reject.
+
+Save each reply as `garage/<key>.json` — the raw JSON is fine, a markdown fence
+around it is fine too — then:
+
+```bash
+python submit.py                # validate, price, and shake down every entry
+python submit.py --race         # also race the garage against the factory
+python submit.py --report       # write garage/report.md to send back
+```
+
+`submit.py` rejects anything out of range, missing, or over budget, then drives
+each accepted car solo on all six circuits and reports lap times, time off the
+road, and how much it slid. That report is written to be pasted straight back
+to the model so it can revise — which is the interesting part, because the first
+answer is usually not the quick one.
+
+Any valid car in `garage/` automatically replaces its factory entry next time
+the game starts, and is badged **DESIGNED BY THE MODEL** on the grid screen.
+
+### The budget
+
+Without a cap every entrant maxes every field and you get seven identical cars.
+There are **60 points** to spend against a theoretical 100 if every field were
+set to its most expensive value. Cost is linear across each field's range, and
+weighted by how much lap time it is actually worth — `grip` costs 16 because it
+is the most valuable thing on this calendar, `mass` costs 3 because it buys
+nothing but the upper hand in a collision. Driving-style fields like `caution`
+and `apex_bias` are free: they change the character of the car, not its ceiling.
+
+The factory cars spend between 39.5 and 59.8 points, so they are all legal
+entries and make honest reference points.
+
 ## Balance
 
 The field laps within a few percent of each other, but with visibly different styles — mean
-peak slip runs from 0.01 (Llama, glued down) through 0.25 (Claude) to 0.65 (Le Chat, sideways
+peak slip runs from 0.01 (DeepSeek, glued down) through 0.25 (Claude) to 0.65 (Kimi, sideways
 everywhere). That balance is not hand-typed: `balance.py` searches each model's `confidence` —
 literally how much corner speed it believes its own car can carry — against the field median,
 preferring the tidiest setting that hits the target.
@@ -140,7 +208,7 @@ Balancing on one circuit does not transfer, which is why the search runs on **al
 setting that was quick round the Autodrome put Grok in the grass for 16% of a lap at Gradient
 Descent. A candidate has to keep the car on the road everywhere before its pace counts. The
 pecking order still changes track to track — Sonar's extra sensors win the twisty one,
-Llama's grip wins the long one.
+DeepSeek's grip wins the long one.
 
 A race is called `FLAG_GRACE` seconds after the winner crosses the line, and anyone still out
 is classified where they lie. Without that rule one car in trouble hangs the session forever.
@@ -191,9 +259,13 @@ hairpin. It now works the other way round: shapes are **drawn by hand** in `layo
 `repair()` nudges control points the smallest amount that makes them legal, so the intended
 silhouette survives. That is where the hairpins, chicanes and esses come from.
 
-Making that work also meant narrowing the road from 240px to 200px and growing the world to
-3000×2000. A corner cannot be tighter than roughly 1.4× the road's half-width before the
-inside kerb folds over itself, so a wide road can only ever produce gentle curves.
+Making that work also meant growing the world to 3000×2000 and, at first, narrowing the road
+to 200px. A corner cannot be tighter than roughly 1.3× the road's half-width before the inside
+kerb folds over itself, so a wide road can only ever produce gentle curves.
+
+The road is back at 240px now, because 200px turned out to be too narrow to race on — see
+**Overtaking** below. Widening it meant re-running `repair_all.py` against a higher minimum
+radius, which is why the hairpins are slightly rounder than the drawings.
 
 The start line is not control point zero — `Track._pick_start` puts it on the longest
 straight, because the grid forms up *behind* the line and lining seven cars up round the
@@ -201,9 +273,9 @@ outside of a hairpin looks absurd.
 
 | Circuit | Length | Min radius | Flat out | Direction changes |
 |---|---|---|---|---|
-| Vector Autodrome | 7649 | 145 | 27% | 9 |
-| Token Speedbowl | 7045 | 146 | 40% | 9 |
-| Gradient Descent | 7410 | 144 | 11% | 13 |
-| Context Window | 7280 | 150 | 34% | 11 |
-| Backprop Street | 8444 | 144 | 32% | 11 |
-| Attention Heads | 10594 | 146 | 24% | 9 |
+| Vector Autodrome | 9747 | 195 | 47% | 9 |
+| Token Speedbowl | 8894 | 203 | 54% | 9 |
+| Gradient Descent | 9167 | 195 | 30% | 13 |
+| Context Window | 9276 | 195 | 51% | 11 |
+| Backprop Street | 10806 | 193 | 47% | 9 |
+| Attention Heads | 13609 | 193 | 46% | 11 |
