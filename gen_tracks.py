@@ -98,7 +98,7 @@ def main():
         print(f"{name:20s} {m['len']:6.0f} {m['minR']:6.0f} {m['clear']:6.0f} "
               f"{m['flat']*100:5.1f}% {m['hairpin']*100:5.1f}% {m['turns']:6d} "
               f"{laps:5d}{flag}")
-        pts = ",\n            ".join(
+        pts = "\n            ".join(
             ", ".join(f"({x}, {y})" for x, y in cp[i:i + 4]) + ","
             for i in range(0, len(cp), 4))
         out.append(f'''    TrackPreset(

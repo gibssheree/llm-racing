@@ -13,8 +13,6 @@ import sys
 import math
 
 sys.path.insert(0, '.')
-import numpy as np
-
 from llmrace.track import Track
 from llmrace.ai import build_brain, Vision, N_EXTRA_FEATURES
 from llmrace.drivers import by_key
@@ -39,13 +37,24 @@ def main():
             net.forward(list(s) + pad + [0.8, 0.0, 0.0, 0.0, 0.0][:N_EXTRA_FEATURES])
             rows.append([net.hidden[2], 1.0])
             targets.append(ideal)
-    A, Y = np.array(rows), np.array(targets)
-    coef, *_ = np.linalg.lstsq(A, Y, rcond=None)
-    pred = A @ coef
-    print(f"fitted over {len(Y)} samples on {len(PRESETS)} circuits")
+    # ordinary least squares on a single predictor - closed form, no numpy
+    n = len(targets)
+    xs = [r[0] for r in rows]
+    mx = sum(xs) / n
+    my = sum(targets) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, targets))
+    slope = sxy / sxx
+    intercept = my - slope * mx
+    coef = (slope, intercept)
+    pred = [slope * x + intercept for x in xs]
+    rms = math.sqrt(sum((p - y) ** 2 for p, y in zip(pred, targets)) / n)
+    worst = max(abs(p - y) for p, y in zip(pred, targets))
+    print(f"fitted over {n} samples on {len(PRESETS)} circuits")
     print(f"  frac = {coef[0]:.3f}*h2 {coef[1]:+.3f}")
-    print(f"  rms  = {np.sqrt(((pred - Y) ** 2).mean()):.4f}   max = {np.abs(pred - Y).max():.4f}")
-    print(f"  predicted {pred.min():.2f}..{pred.max():.2f}  ideal {Y.min():.2f}..{Y.max():.2f}")
+    print(f"  rms  = {rms:.4f}   max = {worst:.4f}")
+    print(f"  predicted {min(pred):.2f}..{max(pred):.2f}  "
+          f"ideal {min(targets):.2f}..{max(targets):.2f}")
     print()
     print("in llmrace/ai.py build_brain():")
     print(f"    net.w2[1][2] = {coef[0] / e.brain.confidence:.2f} * b.confidence * phys")

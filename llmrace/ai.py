@@ -22,8 +22,8 @@ RIVAL_ARC = math.radians(52)  # rivals are only detected inside the front arc
 N_HIDDEN = 10
 N_OUT = 2                   # steer, target-speed
 MAX_SENSOR_ANGLE = 78.0     # degrees either side of the nose
-REF_GRIP = 244.0            # chassis the speed head was fitted against
-REF_TOP_SPEED = 418.0
+REF_GRIP = 250.0            # the chassis the speed head was fitted against
+REF_TOP_SPEED = 420.0       # (Claude's, so its own phys factor comes out at 1.0)
 RIVAL_RADIUS = 23.0         # how big another car looks to the sensors
 RIVAL_SIGHT_2 = 420.0 ** 2  # squared cutoff for bothering to test a rival
 # Explicit fan layouts, in degrees. The three rays nearest the nose are the
@@ -205,7 +205,8 @@ def build_brain(entry):
     # sqrt(grip*R) = d * sqrt(grip/2w) - i.e. safe speed is *proportional*
     # to forward clearance. A linear head can express that exactly.
     # Coefficients least-squares fitted against the grip-limited ideal speed at
-    # every sample of the reference circuit (rms error 0.03 of top speed).
+    # every sample of every circuit - refit with refit.py whenever the road
+    # width or the calendar changes (rms error 0.05 of top speed).
     #
     # The fit was done for the reference chassis, so both terms are rescaled by
     # this car's own physics: safe corner speed goes as sqrt(grip), and the head
@@ -213,11 +214,11 @@ def build_brain(entry):
     # that built a grippier car therefore genuinely commits to faster corners.
     ch = entry.chassis
     phys = math.sqrt(ch.grip / REF_GRIP) * (REF_TOP_SPEED / ch.top_speed)
-    net.w2[1][2] = 3.33 * b.confidence * phys
+    net.w2[1][2] = 3.21 * b.confidence * phys
     net.w2[1][4] = -0.25 * b.caution     # damper: bleeds speed when fast and blind
     net.w2[1][8] = -0.55                 # off the road, slow down
     net.w2[1][9] = -0.30 * (1.35 - entry.temper.aggression)
-    net.b2[1] = -0.68 * phys
+    net.b2[1] = -0.55 * phys
 
     net.jitter(random.Random(entry.seed), 0.006)
     return net
@@ -240,6 +241,7 @@ class Driver:
         self.slide = 0.0
         self.stuck_timer = 0.0
         self.recovering = False
+        self.wrong_way = False
         self.reverse_timer = 0.0
 
     def _traffic_signal(self, car, rivals):
@@ -259,6 +261,19 @@ class Driver:
             if d < cfg.PROXIMITY_RANGE:
                 worst = max(worst, 1.0 - d / cfg.PROXIMITY_RANGE)
         return worst
+
+    def _lap_direction_error(self, car):
+        """Signed heading error against the direction the lap actually runs.
+
+        The network cannot work this out for itself: a road looks identical
+        forwards and backwards through a fan of range sensors. A real driver
+        knows which way round the circuit goes, so the car is told.
+        """
+        i, _ = self.track.nearest(car.x, car.y)
+        tx, ty = self.track.tangent[i]
+        along = math.cos(car.heading) * tx + math.sin(car.heading) * ty
+        err = (math.atan2(ty, tx) - car.heading + math.pi) % (2 * math.pi) - math.pi
+        return along, err
 
     def _heading_error_to_centre(self, car):
         idx, _ = self.track.nearest(car.x, car.y)
@@ -300,8 +315,25 @@ class Driver:
         elif self.recovering and car.speed > ch.top_speed * 0.28:
             self.recovering = False
 
-        # Beached against a barrier: back up and try again.
-        self.stuck_timer = self.stuck_timer + dt if car.speed < 22.0 else 0.0
+        # Facing the wrong way round the lap. Hysteresis so a big slide does
+        # not flip this on and off; once engaged, slow right down and turn.
+        along, dir_err = self._lap_direction_error(car)
+        if self.wrong_way:
+            if along > 0.35:
+                self.wrong_way = False
+        elif along < -0.15:
+            self.wrong_way = True
+        if self.wrong_way:
+            want_steer = clamp(dir_err * 2.0, -1.0, 1.0)
+            target = min(target, ch.top_speed * 0.22)
+
+        # Beached: back up and try again. Only when something solid is in the
+        # way - being held up by the car in front is not being stuck, and
+        # reversing out of a start-line queue used to spin cars round to face
+        # the wrong way for the rest of the race.
+        nose = self.vision.raw[self.vision.count // 2]
+        jammed = (not on) or nose < 46.0
+        self.stuck_timer = self.stuck_timer + dt if (car.speed < 22.0 and jammed) else 0.0
         if self.stuck_timer > 1.1 and self.reverse_timer <= 0.0:
             self.reverse_timer = 0.85 / max(0.5, br.recovery)
             self.stuck_timer = 0.0
@@ -309,7 +341,8 @@ class Driver:
         reversing = self.reverse_timer > 0.0
         if reversing:
             self.reverse_timer -= dt
-            want_steer = clamp(-self._heading_error_to_centre(car) * 1.4, -1.0, 1.0)
+            # steer while backing up so the car comes out pointing down the lap
+            want_steer = clamp(-dir_err * 1.4, -1.0, 1.0)
 
         # --- longitudinal control law ---------------------------------------
         err = target - car.speed

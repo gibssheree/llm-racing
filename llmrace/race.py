@@ -5,6 +5,10 @@ from .drivers import ROSTER
 
 COUNTDOWN, RUNNING, FINISHED = "countdown", "running", "finished"
 
+# Once the winner is home, the rest get this long to complete the lap before
+# the race is called. Without it a single car in trouble hangs the session.
+FLAG_GRACE = 45.0
+
 
 class Race:
     def __init__(self, track, entries=None, laps=cfg.DEFAULT_LAPS, countdown=True):
@@ -19,6 +23,7 @@ class Race:
         self.timer = cfg.COUNTDOWN_SECONDS if countdown else 0.0
         self.time = 0.0
         self.finish_order = []
+        self.flag_time = None
 
     # ---------------------------------------------------------------- update --
     def update(self, dt):
@@ -41,7 +46,13 @@ class Race:
                 car.finished = True
                 car.finish_time = self.time
                 self.finish_order.append(car)
+                if self.flag_time is None:
+                    self.flag_time = self.time
+
         if all(c.finished for c in self.cars):
+            self.state = FINISHED
+        elif self.flag_time is not None and self.time - self.flag_time > FLAG_GRACE:
+            # called on time: whoever is still out is classified where they lie
             self.state = FINISHED
 
         self._rank()

@@ -241,12 +241,16 @@ def draw_results(screen, fonts, race):
     for i, car in enumerate(race.standings()):
         ry = y + 76 + i * 30
         pygame.draw.rect(screen, car.color, (x + 24, ry + 4, 5, 18), border_radius=2)
-        gap = None
-        if car.finish_time and winner.finish_time:
-            gap = car.finish_time - winner.finish_time
+        if car is winner:
+            result = fmt_time(car.finish_time)
+        elif car.finish_time and winner.finish_time:
+            result = fmt_gap(car.finish_time - winner.finish_time)
+        else:
+            # still running when the race was called
+            behind = winner.race_progress() - car.race_progress()
+            result = f"+{int(behind)}L" if behind >= 1.0 else "NOT CLSF"
         cells = (f"{car.race_position:<5}{car.name:<22}{car.entry.vendor:<13}"
-                 f"{(fmt_time(car.finish_time) if car is winner else fmt_gap(gap)):>11}"
-                 f"{fmt_time(car.best_lap):>11}")
+                 f"{result:>11}{fmt_time(car.best_lap):>11}")
         screen.blit(fonts["body"].render(cells, True, cfg.C_TEXT), (x + 38, ry + 3))
     tip = "R restart    ESC quit"
     r = fonts["small"].render(tip, True, cfg.C_TEXT_DIM)

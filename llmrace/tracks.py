@@ -1,10 +1,12 @@
 """Circuit presets.
 
-Each layout was produced by ``tracksearch.py``, which hill-climbs a control
-polygon against hard geometry constraints - minimum corner radius, self
-clearance, world margins - so none of these can contain a corner tighter than
-the road is wide. They are scored for different characters, which is why the
-same grid produces a different pecking order on each one.
+Every layout was drawn by hand for a silhouette - a hairpin is a hairpin
+because the points double back - and then passed through ``tracksearch.repair``,
+which nudges whatever is illegal by the smallest amount that makes it
+driveable. That is why they have distinct shapes rather than the rounded blobs
+a blind search kept producing.
+
+Regenerate with:  python repair_all.py && python gen_tracks.py
 """
 from dataclasses import dataclass
 
@@ -16,43 +18,88 @@ class TrackPreset:
     blurb: str
     control: list
     laps: int = 3
+    stats: dict = None
 
 
 PRESETS = [
     TrackPreset(
         key="autodrome", name="Vector Autodrome",
-        blurb="Balanced. Long straight, one heavy stop, a flowing bottom half.",
-        laps=3,
+        blurb="Long straight, esses down the right, a proper hairpin before the pits.",
+        laps=2,
+        stats={"length": 7649, "min_radius": 145,
+               "flat_out": 0.273, "turns": 9},
         control=[
-            (600, 330), (1125, 284), (1485, 285), (2095, 407), (2301, 655),
-            (2161, 1092), (1834, 1224), (1436, 1308), (1071, 1296), (830, 1314),
-            (589, 1190), (479, 846), (430, 560),
+            (455, 302), (1099, 279), (1784, 271), (2335, 346),
+            (2631, 571), (2622, 825), (2491, 1014), (2488, 1210),
+            (2468, 1513), (2124, 1746), (1720, 1795), (1369, 1696),
+            (1311, 1485), (1450, 1188), (1323, 996), (874, 1052),
+            (725, 1364), (504, 1463), (287, 1263), (331, 781),
         ]),
     TrackPreset(
         key="speedbowl", name="Token Speedbowl",
-        blurb="Half the lap flat out. Rewards top speed and a brave right foot.",
-        laps=4,
+        blurb="Two enormous straights joined by a hairpin at each end. Bring top speed.",
+        laps=3,
+        stats={"length": 7045, "min_radius": 146,
+               "flat_out": 0.398, "turns": 9},
         control=[
-            (523, 470), (1145, 282), (1782, 331), (2200, 470), (2280, 860),
-            (1970, 1129), (1515, 1301), (825, 1368), (560, 1120), (346, 739),
+            (420, 319), (1170, 275), (1958, 286), (2446, 367),
+            (2727, 623), (2724, 894), (2571, 1154), (2582, 1369),
+            (2467, 1596), (2056, 1777), (1241, 1730), (720, 1761),
+            (352, 1438), (441, 1087), (488, 864), (302, 576),
         ]),
     TrackPreset(
         key="technical", name="Gradient Descent",
-        blurb="Almost no straights. Grip and steering rate decide everything.",
+        blurb="An infield knot. Chicane, hairpin, esses, and almost nowhere to rest.",
         laps=3,
+        stats={"length": 7410, "min_radius": 144,
+               "flat_out": 0.111, "turns": 13},
         control=[
-            (708, 334), (1187, 240), (1498, 377), (1959, 360), (2332, 755),
-            (2228, 1221), (1778, 1342), (1389, 1214), (1163, 1266), (919, 1279),
-            (608, 1127), (445, 921), (430, 642),
+            (525, 302), (953, 225), (1250, 418), (1620, 372),
+            (1866, 429), (2173, 327), (2575, 453), (2618, 724),
+            (2495, 974), (2540, 1331), (2390, 1492), (1992, 1446),
+            (1694, 1687), (1431, 1741), (1288, 1557), (1212, 1159),
+            (1000, 1112), (756, 1414), (433, 1488), (319, 1305),
+            (542, 960), (586, 773), (448, 530),
         ]),
     TrackPreset(
         key="endurance", name="Context Window",
-        blurb="The longest lap on the calendar. Consistency beats outright pace.",
-        laps=2,
+        blurb="The longest lap here. Wide sweepers, a stadium section, one heavy stop.",
+        laps=3,
+        stats={"length": 7280, "min_radius": 150,
+               "flat_out": 0.338, "turns": 11},
         control=[
-            (480, 560), (820, 340), (1265, 218), (1813, 257), (2188, 352),
-            (2360, 720), (2280, 1080), (1940, 1300), (1509, 1389), (1019, 1348),
-            (720, 1340), (450, 1100), (389, 799),
+            (386, 622), (790, 318), (1410, 307), (2061, 315),
+            (2542, 358), (2792, 703), (2766, 1037), (2594, 1271),
+            (2582, 1542), (2413, 1781), (1895, 1792), (1434, 1727),
+            (1280, 1573), (1242, 1271), (1079, 1170), (822, 1282),
+            (530, 1474), (323, 1352), (356, 898),
+        ]),
+    TrackPreset(
+        key="street", name="Backprop Street",
+        blurb="Angular street circuit. Long drags into near right-angle corners.",
+        laps=2,
+        stats={"length": 8444, "min_radius": 144,
+               "flat_out": 0.320, "turns": 11},
+        control=[
+            (389, 406), (1143, 337), (1946, 342), (2626, 403),
+            (2683, 688), (2299, 925), (2303, 1155), (2675, 1344),
+            (2655, 1697), (1954, 1800), (1470, 1714), (1342, 1244),
+            (1050, 1194), (807, 1703), (493, 1699), (382, 1399),
+            (479, 1118), (334, 792),
+        ]),
+    TrackPreset(
+        key="twinloop", name="Attention Heads",
+        blurb="Two big loops pinched together in the middle. Rhythm is everything.",
+        laps=2,
+        stats={"length": 10594, "min_radius": 146,
+               "flat_out": 0.238, "turns": 9},
+        control=[
+            (544, 470), (1069, 320), (1480, 530), (1389, 895),
+            (883, 979), (714, 1348), (1016, 1586), (1593, 1566),
+            (2063, 1566), (2154, 1250), (1836, 943), (1910, 627),
+            (2327, 436), (2731, 606), (2794, 1078), (2669, 1547),
+            (2268, 1828), (1557, 1836), (798, 1834), (315, 1588),
+            (305, 1021), (347, 695),
         ]),
 ]
 

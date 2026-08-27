@@ -2,26 +2,10 @@
 import math
 
 from . import config as cfg
+from .tracks import DEFAULT
 from .vec import dist2, norm, sub
 
 
-# Hand-authored control points for the circuit, in world coordinates.
-# The spline is closed, so the last point connects back to the first.
-CONTROL_POINTS = [
-    (600, 330),     # start / finish, on the long top straight
-    (1125, 284),
-    (1485, 285),
-    (2095, 407),    # straight ends, turn in for the fast right
-    (2301, 655),
-    (2161, 1092),   # heaviest braking zone on the lap
-    (1834, 1224),
-    (1436, 1308),
-    (1071, 1296),   # long, flowing bottom section
-    (830, 1314),
-    (589, 1190),
-    (479, 846),     # uphill left-hander onto the straight
-    (430, 560),
-]
 
 
 def _catmull_rom(p0, p1, p2, p3, t):
@@ -45,7 +29,8 @@ class Track:
 
     def __init__(self, control_points=None, half_width=cfg.TRACK_HALF_WIDTH,
                  build_mask=True):
-        self.control = list(control_points or CONTROL_POINTS)
+        # one source of truth for layouts: llmrace/tracks.py
+        self.control = list(control_points or DEFAULT.control)
         self.half_width = half_width
         self.center = []      # dense centreline points
         self.tangent = []     # unit forward vector at each sample
@@ -154,8 +139,28 @@ class Track:
         span = 4
         self.corner = [sum(k[(i + d) % m] for d in range(-span, span + 1)) / (2 * span + 1)
                        for i in range(m)]
-        self.start_index = 0
-        self.finish_line = (self.left[0], self.right[0])
+        self.start_index = self._pick_start()
+        i = self.start_index
+        self.finish_line = (self.left[i], self.right[i])
+
+    def _pick_start(self):
+        """Put the start line on the longest straight.
+
+        The grid forms up *behind* the line, so what matters is that the road
+        is open through the samples leading into it - a start line halfway
+        round a hairpin looks wrong and lines the cars up in the scenery.
+        """
+        if not self._want_mask:
+            return 0
+        m = len(self.center)
+        fwd = [self.raycast(*self.center[i], *self.tangent[i]) for i in range(m)]
+        run = max(6, int(260 / self.spacing))       # grid length, in samples
+        best, best_i = -1.0, 0
+        for i in range(m):
+            score = min(fwd[(i - k) % m] for k in range(run))
+            if score > best:
+                best, best_i = score, i
+        return best_i
 
     def _build_mask(self):
         """Rasterise the tarmac into a coarse bitmap.

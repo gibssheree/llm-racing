@@ -22,7 +22,7 @@ python main.py --list
 ## Front end
 
 - **Main menu** — start a race, or jump to the circuit, grid and settings screens.
-- **Circuit** — four layouts with live previews; picking one also sets its default distance.
+- **Circuit** — six layouts with live previews; picking one also sets its default distance.
 - **Grid** — click any model to enter or withdraw it. A race needs at least four cars, so
   the fourth cannot be removed. Full chassis stats are on each row.
 - **Settings** — race distance, sensor overlay, telemetry panel, tyre marks, leader-cam.
@@ -62,9 +62,17 @@ against the ideal speed at every sample of the circuit (rms error 0.03 of top sp
 Each car rescales it by `sqrt(grip)/top_speed`, so a model that built a grippier car
 genuinely commits to faster corners.
 
-Two safety systems sit outside the network: an off-track recovery that aims at the nearest
-centreline when every ray reads short, and a reversing routine for a car beached on a barrier.
-Both are scaled by that model's `recovery` stat.
+Three safety systems sit outside the network, all scaled by that model's `recovery` stat:
+
+- **Off-track recovery** — when every ray reads short the network's vision is useless, so a
+  lower-level system aims at the nearest centreline.
+- **Wrong-way correction** — a road looks *identical* forwards and backwards through a fan of
+  range sensors, so the network cannot tell which way the lap runs. Without this, a car that
+  got turned around at the start would happily circulate backwards for the entire race,
+  never scoring a lap. It is told which way the circuit goes, the way a real driver knows.
+- **Un-beaching** — reverse out when something solid is in the way. Deliberately *not*
+  triggered by simply being held up: reversing out of a start-line queue was what spun cars
+  round to face the wrong way in the first place.
 
 ## Overtaking
 
@@ -118,17 +126,24 @@ being watched.
 
 ## Balance
 
-All seven lap within a few tenths of each other, but with visibly different styles — peak
-slip runs from 0.00 (Llama, glued down) to 0.55 (Le Chat, sideways everywhere). That balance
-is not hand-typed: `balance.py` searches each model's `confidence` — literally how much corner
-speed it believes its own car can carry — against the field median, preferring the tidiest
-setting that hits the target.
+The field laps within a few percent of each other, but with visibly different styles — mean
+peak slip runs from 0.01 (Llama, glued down) through 0.25 (Claude) to 0.65 (Le Chat, sideways
+everywhere). That balance is not hand-typed: `balance.py` searches each model's `confidence` —
+literally how much corner speed it believes its own car can carry — against the field median,
+preferring the tidiest setting that hits the target.
 
-Balancing on one circuit does not transfer, which is why the search runs on **all four**: a
+Slip is *averaged* across circuits rather than maxed. Over six tracks almost every setting
+touches full slide somewhere, so a worst-case reading stopped telling the tidy setups apart
+from the ragged ones, and the balancer happily handed every car a setup that slid everywhere.
+
+Balancing on one circuit does not transfer, which is why the search runs on **all six**: a
 setting that was quick round the Autodrome put Grok in the grass for 16% of a lap at Gradient
-Descent. A candidate now has to keep the car on the road everywhere before its pace counts.
-The pecking order still changes track to track — Sonar's extra sensors win the twisty one,
-Grok's top speed wins the long one.
+Descent. A candidate has to keep the car on the road everywhere before its pace counts. The
+pecking order still changes track to track — Sonar's extra sensors win the twisty one,
+Llama's grip wins the long one.
+
+A race is called `FLAG_GRACE` seconds after the winner crosses the line, and anyone still out
+is classified where they lie. Without that rule one car in trouble hangs the session forever.
 
 ## Layout
 
@@ -160,17 +175,35 @@ python shot.py                  # render frames off-screen to shots/
 ```
 
 ```bash
+python benchall.py              # every model on every circuit - the "nothing is broken" check
 python uitest.py                # drive every menu screen and a full race off-screen
+python repair_all.py            # re-legalise the drawn layouts in layouts.py
+python gen_tracks.py            # regenerate llmrace/tracks.py from them
+python refit.py                 # refit the speed head after a geometry change
+python trackshots.py            # contact sheet of every circuit
 ```
 
-`tracksearch.py` exists because hand-placed control points kept producing corners tighter
-than the road is wide. It searches layouts scored on flat-out road while rejecting anything
-undriveable — minimum corner radius, self-clearance, world margins. All four circuits came
-out of it.
+### Drawing circuits
 
-| Circuit | Length | Min radius | Flat out |
-|---|---|---|---|
-| Vector Autodrome | 4926 | 223 | 49% |
-| Token Speedbowl | 4916 | 221 | 53% |
-| Gradient Descent | 5042 | 219 | 8% |
-| Context Window | 5188 | 220 | 47% |
+The first version of `tracksearch.py` hill-climbed layouts from scratch, and every one came
+out a rounded blob — a blind search optimising for flat-out road has no reason to invent a
+hairpin. It now works the other way round: shapes are **drawn by hand** in `layouts.py`, and
+`repair()` nudges control points the smallest amount that makes them legal, so the intended
+silhouette survives. That is where the hairpins, chicanes and esses come from.
+
+Making that work also meant narrowing the road from 240px to 200px and growing the world to
+3000×2000. A corner cannot be tighter than roughly 1.4× the road's half-width before the
+inside kerb folds over itself, so a wide road can only ever produce gentle curves.
+
+The start line is not control point zero — `Track._pick_start` puts it on the longest
+straight, because the grid forms up *behind* the line and lining seven cars up round the
+outside of a hairpin looks absurd.
+
+| Circuit | Length | Min radius | Flat out | Direction changes |
+|---|---|---|---|---|
+| Vector Autodrome | 7649 | 145 | 27% | 9 |
+| Token Speedbowl | 7045 | 146 | 40% | 9 |
+| Gradient Descent | 7410 | 144 | 11% | 13 |
+| Context Window | 7280 | 150 | 34% | 11 |
+| Backprop Street | 8444 | 144 | 32% | 11 |
+| Attention Heads | 10594 | 146 | 24% | 9 |

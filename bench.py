@@ -2,12 +2,15 @@
 import sys, math
 sys.path.insert(0, '.')
 from llmrace.track import Track
+from llmrace.tracks import by_key as track_by_key, DEFAULT
 from llmrace.race import Race
 from llmrace.drivers import ROSTER
 
 
-def bench(laps=4, limit=150.0):
-    track = Track()
+def bench(laps=None, limit=200.0, track_key=None):
+    preset = track_by_key(track_key) if track_key else DEFAULT
+    track = Track(preset.control)
+    laps = laps or preset.laps
     rows = []
     for e in ROSTER:
         r = Race(track, [e], laps=laps, countdown=False)

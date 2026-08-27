@@ -69,8 +69,10 @@ class Menu:
         self.widgets = []
         getattr(self, "_build_" + self.screen)()
         if self.screen != MAIN:
-            self.widgets.append(ui.Button((40, cfg.SCREEN_H - 74, 150, 44),
-                                          "BACK", lambda: self.go(MAIN)))
+            # top right, clear of the content: the circuit grid runs the full
+            # width of the screen and a bottom-left button sat on top of it
+            self.widgets.append(ui.Button((cfg.SCREEN_W - 176, 30, 136, 42),
+                                          "BACK", lambda: self.go(MAIN), tip="esc"))
 
     def handle(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -146,12 +148,19 @@ class Menu:
 
     # -------------------------------------------------------- track picker --
     def _build_tracks(self):
-        w, h, gap = 288, 300, 20
-        total = len(PRESETS) * w + (len(PRESETS) - 1) * gap
-        x0 = cfg.SCREEN_W // 2 - total // 2
+        # six circuits do not fit across the screen, so lay them out in a grid
+        per_row = 3
+        w, h, gap = 400, 300, 22
+        rows = (len(PRESETS) + per_row - 1) // per_row
         for i, p in enumerate(PRESETS):
+            col, row = i % per_row, i // per_row
+            wide = min(per_row, len(PRESETS) - row * per_row)
+            total = wide * w + (wide - 1) * gap
+            x0 = cfg.SCREEN_W // 2 - total // 2
+            y0 = (cfg.SCREEN_H - 110 - rows * h - (rows - 1) * gap) // 2 + 110
             self.widgets.append(
-                ui.Hotspot((x0 + i * (w + gap), 130, w, h), self._pick_track(p.key)))
+                ui.Hotspot((x0 + col * (w + gap), y0 + row * (h + gap), w, h),
+                           self._pick_track(p.key)))
 
     def _pick_track(self, key):
         def go():
@@ -162,7 +171,7 @@ class Menu:
 
     def _draw_tracks(self, screen, fonts):
         self._heading(screen, fonts, "CIRCUIT",
-                      "four layouts, each one favouring a different kind of car")
+                      f"{len(PRESETS)} layouts, each one favouring a different kind of car")
         for w, p in zip(self.widgets, PRESETS):
             r = w.rect
             chosen = p.key == self.s.track_key
@@ -172,10 +181,10 @@ class Menu:
             pygame.draw.rect(screen, ui.ACCENT if chosen else (ui.EDGE_ON if w.hot else ui.EDGE),
                              r, 2 if chosen else 1, border_radius=7)
             draw_track_shape(screen, p.control,
-                             pygame.Rect(r.x + 12, r.y + 12, r.width - 24, 168),
+                             pygame.Rect(r.x + 12, r.y + 12, r.width - 24, 176),
                              ui.ACCENT if chosen else (150, 158, 175))
-            screen.blit(fonts["bold"].render(p.name, True, ui.TEXT), (r.x + 16, r.y + 190))
-            line, ly = "", r.y + 212
+            screen.blit(fonts["bold"].render(p.name, True, ui.TEXT), (r.x + 16, r.y + 198))
+            line, ly = "", r.y + 220
             for word in p.blurb.split():
                 trial = (line + " " + word).strip()
                 if fonts["tiny"].size(trial)[0] > r.width - 32:
@@ -184,8 +193,14 @@ class Menu:
                 else:
                     line = trial
             screen.blit(fonts["tiny"].render(line, True, ui.DIM), (r.x + 16, ly))
-            screen.blit(fonts["tiny"].render(f"{p.laps} laps by default", True,
+            st = p.stats or {}
+            facts = f"{p.laps} laps   {st.get('length', 0)/1000:.1f}k px"
+            screen.blit(fonts["tiny"].render(facts, True,
                                              ui.ACCENT if chosen else ui.FAINT),
+                        (r.x + 16, r.bottom - 40))
+            shape = (f"{st.get('turns', 0)} direction changes   "
+                     f"{st.get('flat_out', 0)*100:.0f}% flat out")
+            screen.blit(fonts["tiny"].render(shape, True, ui.FAINT),
                         (r.x + 16, r.bottom - 24))
 
     # --------------------------------------------------------- grid picker --
@@ -253,8 +268,15 @@ class Menu:
             screen.blit(fonts["tiny"].render(e.vendor, True, ui.DIM if on else ui.FAINT),
                         (r.x + 252, r.centery - 6))
             tag = e.tagline
-            while tag and fonts["tiny"].size(tag)[0] > tag_limit:
-                tag = tag[:-2]
+            if fonts["tiny"].size(tag)[0] > tag_limit:
+                words = tag.split()
+                tag = ""
+                for word in words:
+                    trial = (tag + " " + word).strip()
+                    if fonts["tiny"].size(trial + " ...")[0] > tag_limit:
+                        break
+                    tag = trial
+                tag += " ..."
             screen.blit(fonts["tiny"].render(tag, True, ui.DIM if on else ui.FAINT),
                         (r.x + 344, r.centery - 6))
             ch = e.chassis

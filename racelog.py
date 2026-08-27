@@ -2,11 +2,14 @@
 import sys
 sys.path.insert(0, '.')
 from llmrace.track import Track
+from llmrace.tracks import by_key as track_by_key, DEFAULT
 from llmrace.race import Race, FINISHED
 
 
-def run(laps=3, limit=200.0, show=True):
-    track = Track()
+def run(laps=None, limit=200.0, show=True, track_key=None):
+    preset = track_by_key(track_key) if track_key else DEFAULT
+    track = Track(preset.control)
+    laps = laps or preset.laps
     race = Race(track, laps=laps, countdown=False)
     prev = {c.entry.key: c.race_position for c in race.cars}
     passes = []

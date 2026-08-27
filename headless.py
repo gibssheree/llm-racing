@@ -2,12 +2,15 @@
 import sys, time, argparse
 sys.path.insert(0, '.')
 from llmrace.track import Track
+from llmrace.tracks import by_key as track_by_key, DEFAULT
 from llmrace.race import Race, FINISHED
 from llmrace.drivers import ROSTER
 
 
-def run(laps=3, dt=1/60, limit=400.0, verbose=True):
-    track = Track()
+def run(laps=None, dt=1/60, limit=400.0, verbose=True, track_key=None):
+    preset = track_by_key(track_key) if track_key else DEFAULT
+    track = Track(preset.control)
+    laps = laps or preset.laps
     race = Race(track, laps=laps, countdown=False)
     t0 = time.perf_counter()
     steps = 0
@@ -35,6 +38,7 @@ def run(laps=3, dt=1/60, limit=400.0, verbose=True):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--laps", type=int, default=3)
+    ap.add_argument("--laps", type=int, default=None)
+    ap.add_argument("--track", default=None)
     ap.add_argument("--limit", type=float, default=400.0)
     run(**vars(ap.parse_args()))

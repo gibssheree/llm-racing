@@ -326,9 +326,9 @@ class Game:
             hud.draw_telemetry(screen, f, focus, self.race)
 
         r = f["big"].render(hud.fmt_time(self.race.time), True, cfg.C_TEXT)
-        screen.blit(r, (cfg.SCREEN_W // 2 - r.get_width() // 2, 14))
+        screen.blit(r, (cfg.SCREEN_W // 2 - r.get_width() // 2, 10))
         name = f["small"].render(self.settings.track.name, True, cfg.C_TEXT_DIM)
-        screen.blit(name, (cfg.SCREEN_W // 2 - name.get_width() // 2, 44))
+        screen.blit(name, (cfg.SCREEN_W // 2 - name.get_width() // 2, 10 + r.get_height() + 2))
 
         if self.race.state == COUNTDOWN:
             hud.draw_countdown(screen, f, self.race)
@@ -338,15 +338,28 @@ class Game:
             hud.draw_results(screen, f, self.race)
 
         cam_txt = "free" if self.cam_manual else CAM_NAMES[self.cam_mode]
-        who = "leader" if self.follow_leader else focus.name
-        bits = [f"cam {cam_txt}", f"watching {who}",
-                "TAB / arrows / 1-9 focus", "drag + wheel free cam",
-                "C camera", "L leader", "V vision", "T telemetry",
-                "SPACE pause", "R restart", "ESC menu"]
+        who = "the leader" if self.follow_leader else focus.name
+        status = f"{cam_txt} cam - watching {who}"
         if self.time_scale != 1.0:
-            bits.insert(0, f"x{self.time_scale:g}")
-        r = f["tiny"].render("   ".join(bits), True, cfg.C_TEXT_DIM)
-        screen.blit(r, (cfg.SCREEN_W // 2 - r.get_width() // 2, cfg.SCREEN_H - 22))
+            status += f" - x{self.time_scale:g}"
+        st = f["small"].render(status, True, cfg.C_ACCENT)
+        screen.blit(st, (cfg.SCREEN_W // 2 - st.get_width() // 2, 66))
+
+        # Drop hints from the end until the line fits the strip the side panels
+        # leave free. Centring the full string on the screen ran it underneath
+        # the telemetry panel and off the right-hand edge.
+        left = HUD_INSETS[0]
+        room = cfg.SCREEN_W - left - 20
+        bits = ["TAB / arrows / 1-9 focus", "drag + wheel free cam", "C view",
+                "L leader", "V vision", "T telemetry", "SPACE pause",
+                "R restart", "ESC menu"]
+        while bits:
+            line = "   ".join(bits)
+            r = f["tiny"].render(line, True, cfg.C_TEXT_DIM)
+            if r.get_width() <= room:
+                break
+            bits.pop()
+        screen.blit(r, (left + (room - r.get_width()) // 2, cfg.SCREEN_H - 22))
 
     # ----------------------------------------------------------------- loop --
     def run(self):

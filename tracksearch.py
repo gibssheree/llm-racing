@@ -14,7 +14,8 @@ sys.path.insert(0, '.')
 from llmrace.track import Track
 from llmrace import config as cfg
 
-MIN_RADIUS = 145.0      # tight enough for a real hairpin at a 100px half width
+MIN_RADIUS = 142.0      # tight enough for a real hairpin at a 100px half width
+                        # (inner kerb still has 42px of radius left)
 MIN_CLEAR = 252.0       # 2 * half width + room for a car between two straights
 MARGIN = 46.0
 SEP = 26                # samples apart before two bits of track count as separate

@@ -7,7 +7,7 @@ carry.
 
 Balancing on one circuit does not transfer: a setting that is quick round the
 Autodrome puts a loose chassis in the grass at Gradient Descent. So a candidate
-has to keep the car on the road on *all four* tracks before its pace counts.
+has to keep the car on the road on *every* circuit before its pace counts.
 
 Run:  python balance.py
 """
@@ -22,14 +22,14 @@ from llmrace.drivers import ROSTER
 from llmrace.tracks import PRESETS
 
 TARGET = None             # None = median of the field as authored
-TOLERANCE = 0.15          # laps within this of target count as equally good
+TOLERANCE = 0.45          # laps within this of target count as equally good
 MAX_OFF = 2.0             # percent of a lap in the grass before it is rejected
 LAPS = 2
-CONF_LO, CONF_HI = 0.78, 1.30
-STEPS = 11
+CONF_LO, CONF_HI = 0.78, 1.20
+STEPS = 9
 
 
-def solo(track, entry, laps=LAPS, limit=70.0):
+def solo(track, entry, laps=LAPS, limit=140.0):
     r = Race(track, [entry], laps=laps, countdown=False)
     c = r.cars[0]
     off = n = 0
@@ -44,14 +44,19 @@ def solo(track, entry, laps=LAPS, limit=70.0):
 
 
 def across(tracks, entry):
-    """(mean lap, worst off-track %, worst slip) over every circuit."""
+    """(mean lap, worst off-track %, mean peak slip) over every circuit.
+
+    Slip is averaged, not maxed: across six circuits almost every setting
+    touches full slide somewhere, so a worst-case reading stopped telling the
+    tidy setups apart from the ragged ones.
+    """
     laps, offs, slips = [], [], []
     for t in tracks:
         lap, off, slip = solo(t, entry)
         laps.append(lap)
         offs.append(off)
         slips.append(slip)
-    return statistics.mean(laps), max(offs), max(slips)
+    return statistics.mean(laps), max(offs), statistics.mean(slips)
 
 
 def with_confidence(entry, k):
