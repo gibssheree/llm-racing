@@ -1,0 +1,97 @@
+name: Checks
+
+# Generic CI for Gilbert's repos. Detects the stack and runs whatever exists:
+# install, lint, typecheck, test, build (Node/pnpm), build/vet/test (Go),
+# install/compile/pytest (Python), cargo check (Rust/Tauri).
+# Navael only merges its PRs when every check here passes.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect stack
+        id: stack
+        run: |
+          if [ -f pnpm-lock.yaml ]; then echo "node=pnpm" >> "$GITHUB_OUTPUT";
+          elif [ -f package.json ]; then echo "node=npm" >> "$GITHUB_OUTPUT"; fi
+          [ -f go.mod ] && echo "go=1" >> "$GITHUB_OUTPUT"
+          { [ -f requirements.txt ] || [ -f pyproject.toml ]; } && echo "python=1" >> "$GITHUB_OUTPUT"
+          if [ -f src-tauri/Cargo.toml ]; then echo "cargo=src-tauri/Cargo.toml" >> "$GITHUB_OUTPUT";
+          elif [ -f Cargo.toml ]; then echo "cargo=Cargo.toml" >> "$GITHUB_OUTPUT"; fi
+          true
+
+      - name: Set up Node
+        if: steps.stack.outputs.node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Node checks
+        if: steps.stack.outputs.node
+        env:
+          PM: ${{ steps.stack.outputs.node }}
+        run: |
+          corepack enable
+          if [ "$PM" = pnpm ]; then pnpm install --frozen-lockfile || pnpm install; else npm ci || npm install; fi
+          has_script() {
+            node -e "const s=(require('./package.json').scripts||{})['$1']; process.exit(s && !/no test specified/.test(s) ? 0 : 1)"
+          }
+          for s in lint typecheck test build; do
+            if has_script "$s"; then echo "::group::$PM run $s"; $PM run "$s"; echo "::endgroup::"; fi
+          done
+
+      - name: Set up Go
+        if: steps.stack.outputs.go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Go checks
+        if: steps.stack.outputs.go
+        run: |
+          go build ./...
+          go vet ./...
+          go test ./...
+
+      - name: Set up Python
+        if: steps.stack.outputs.python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python checks
+        if: steps.stack.outputs.python
+        run: |
+          python -m pip install --upgrade pip
+          deps_ok=1
+          if [ -f requirements.txt ]; then pip install -r requirements.txt || deps_ok=0; fi
+          if [ -f pyproject.toml ]; then pip install -e . || deps_ok=0; fi
+          python -m compileall -q -x '(\.venv|venv|node_modules|\.git)' .
+          if ls tests test_*.py */test_*.py >/dev/null 2>&1; then
+            if [ "$deps_ok" = 1 ]; then pip install pytest && pytest -q; else echo "::error::dependencies failed to install, cannot run tests"; exit 1; fi
+          fi
+
+      - name: Tauri system libraries
+        if: startsWith(steps.stack.outputs.cargo, 'src-tauri')
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+      - name: Set up Rust
+        if: steps.stack.outputs.cargo
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust checks
+        if: steps.stack.outputs.cargo
+        run: cargo check --manifest-path "${{ steps.stack.outputs.cargo }}"
