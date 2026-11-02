@@ -154,10 +154,16 @@ class Track:
             return 0
         m = len(self.center)
         fwd = [self.raycast(*self.center[i], *self.tangent[i]) for i in range(m)]
-        run = max(6, int(260 / self.spacing))       # grid length, in samples
+        # Cover the whole grid, with room to spare - scoring only the last few
+        # metres put the back of the field around the preceding corner.
+        run = max(6, int((self.grid_length(8) + 120) / self.spacing))
         best, best_i = -1.0, 0
         for i in range(m):
-            score = min(fwd[(i - k) % m] for k in range(run))
+            # straightness matters as much as sight lines: the grid has to be
+            # flat enough that every car is pointing the same way
+            clear = min(fwd[(i - k) % m] for k in range(run))
+            bend = max(self.curvature[(i - k) % m] for k in range(run))
+            score = clear - bend * 90000.0
             if score > best:
                 best, best_i = score, i
         return best_i
@@ -266,22 +272,29 @@ class Track:
         return len(self.center)
 
     # ------------------------------------------------------- starting grid --
+    def grid_length(self, count):
+        """How much road the whole grid occupies, nose of P1 to tail of last."""
+        return 60.0 + max(0, count - 1) * cfg.GRID_ROW_GAP + cfg.CAR_LENGTH
+
     def grid_slots(self, count):
-        """Poles laid out two-by-two behind the start line, on the tarmac."""
+        """A staggered grid, each car set back and offset from the one ahead.
+
+        Cars are placed one at a time rather than two abreast: a two-wide grid
+        needed twice the road and, on anything but a dead straight, splayed the
+        back rows across the track at angles to each other.
+        """
         m = len(self.center)
         slots = []
+        idx = self.start_index
+        travelled = 0.0
         for k in range(count):
-            row = k // 2
-            col = -1 if (k % 2 == 0) else 1
-            back = 50 + row * cfg.GRID_ROW_GAP
-            idx = self.start_index
-            travelled = 0.0
+            back = 60.0 + k * cfg.GRID_ROW_GAP
             while travelled < back:
                 nxt = (idx - 1) % m
                 travelled += math.dist(self.center[idx], self.center[nxt])
                 idx = nxt
             cx, cy = self.center[idx]
             nx, ny = self.normal[idx]
-            off = col * cfg.GRID_COL_GAP
+            off = (-1 if k % 2 == 0 else 1) * cfg.GRID_COL_GAP
             slots.append(((cx + nx * off, cy + ny * off), self.heading_at(idx), idx))
         return slots

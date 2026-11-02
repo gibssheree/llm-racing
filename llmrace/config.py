@@ -22,8 +22,8 @@ MASK_RES = 4                   # tarmac bitmap resolution, px per cell
 # ------------------------------------------------------------------- race ----
 DEFAULT_LAPS = 3
 COUNTDOWN_SECONDS = 3.6
-GRID_ROW_GAP = 82              # spacing between rows on the starting grid
-GRID_COL_GAP = 84              # lateral spacing between the two grid columns
+GRID_ROW_GAP = 64              # along-track spacing between successive cars
+GRID_COL_GAP = 52              # lateral stagger either side of the centreline
 
 # ---------------------------------------------------------------- physics ----
 # Units are pixels and seconds. One "metre" is roughly 12px.
